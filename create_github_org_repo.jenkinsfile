@@ -1,21 +1,20 @@
 pipeline {
-    agent any
+  agent any
 
-    stages {
-        stage('Hello') {
-            steps {
-                withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) { 
-                  script {
-                    
-                    def response = sh(returnStdout: true, script: 'curl -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/argocd-manifest-test/repos -d \'{"name":"hello-world"}\'')
-                    if (response.contains("Bad credentials")) {
-                        echo "fail"
-                    } else {
-                        echo "success"
-                    }
-                }
-                }
+  stages {
+    stage('Hello') {
+      steps {
+        withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) { 
+          script {
+            def response = sh(returnStdout: true, script: 'curl -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/argocd-manifest-test/repos -d \'{"name":"hello-world"}\'')
+            if (response == "201") {
+              echo "success"
+            } else {
+              error("Failed to create repository, response code: ${response}")
             }
+          }
         }
+      }
     }
+  }
 }
