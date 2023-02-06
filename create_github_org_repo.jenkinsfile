@@ -12,7 +12,6 @@ pipeline {
           script {
 
             def response = sh(returnStdout: true, script: 'curl -w \'%{http_code}\' -o /dev/null -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/${ORG_NAME}/repos -d \'{"name":"' + "${REPO_NAME}" + '"}\'')
-            println "response: ${response}"
             if (response != "201"){
               error("Failed to create repository, response code: ${response}")
             }
