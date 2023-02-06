@@ -1,4 +1,4 @@
-def create_github_repo_in_org(Map params) {
+def createGithubRepoInOrgOrRaiseException(Map params) {
     def repoName = params.repoName
     def accessToken = params.accessToken
 
