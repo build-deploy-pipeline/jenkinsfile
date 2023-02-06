@@ -1,4 +1,5 @@
-import groovyx.net.http.RESTClient
+@Grab('org.codehaus.groovy.modules.http-builder:http-builder:0.7.1')
+
 
 def createGithubRepoInOrgOrRaiseException (Map params) {
     def repoName = params.repoName
