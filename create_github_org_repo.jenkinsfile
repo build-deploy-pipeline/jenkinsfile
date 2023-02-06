@@ -2,14 +2,12 @@ pipeline {
   agent any
 
   stages {
-    stage('Hello') {
+    stage('create git repo in org') {
       steps {
-        withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) { 
+        withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) {
           script {
             def response = sh(returnStdout: true, script: 'curl -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/argocd-manifest-test/repos -d \'{"name":"hello-world"}\'')
-            if (response == "201") {
-              echo "success"
-            } else {
+            if (response != "201"){
               error("Failed to create repository, response code: ${response}")
             }
           }
