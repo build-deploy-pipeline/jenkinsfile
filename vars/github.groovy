@@ -9,7 +9,7 @@ def createGithubRepoInOrgOrRaiseException (Map params) {
     def org_name = 'argocd-manifest-test'
     try{
       def response = githubApi.post(
-        path: "orgs${org_name}/repos"
+        path: "orgs${org_name}/repos",
         headers: [
             'Authorization': "Bearer ${accessToken}",
             'Content-Type': 'application/json'
