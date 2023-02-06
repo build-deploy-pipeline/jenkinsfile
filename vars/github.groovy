@@ -1,8 +1,9 @@
-def createGithubRepoInOrgOrRaiseException(Map params) {
+import groovyx.net.http.RESTClient
+
+def createGithubRepoInOrgOrRaiseException (Map params) {
     def repoName = params.repoName
     def accessToken = params.accessToken
 
-    import groovyx.net.http.RESTClient
 
     def githubApi = new RESTClient('https://api.github.com')
     def org_name = 'argocd-manifest-test'
