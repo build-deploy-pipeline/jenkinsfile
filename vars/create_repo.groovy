@@ -3,7 +3,7 @@
 import groovyx.net.http.RESTClient
 
 
-def createGithubRepoInOrgOrRaiseException (Map params) {
+def call(Map params) {
     def repoName = params.repoName
     def accessToken = params.accessToken
 
