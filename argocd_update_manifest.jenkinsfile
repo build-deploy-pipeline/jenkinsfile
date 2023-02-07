@@ -1,0 +1,29 @@
+pipeline {
+  agent any
+
+  environment {
+    ORG_NAME = "argocd-manifest-test"
+    REPO_NAME = "manifest-ex1"
+    TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
+  }
+
+  stages {
+    // manifest가 없으면 생성
+    // 생성실패하면 raise exception
+    stage('create git repo in org') {
+      steps {
+        withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) {
+          script {
+            def response = sh(returnStdout: true, script: 'curl -w \'%{http_code}\' -o /dev/null -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/${ORG_NAME}/repos -d \'{"name":"' + "${REPO_NAME}" + '"}\'')
+            if (response != "201"){
+              error("Failed to create repository, response code: ${response}")
+            }
+          }
+        }
+      }
+      steps {
+
+      }
+    }
+  }
+}
