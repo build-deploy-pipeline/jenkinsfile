@@ -1,20 +1,29 @@
+// github repo가 있는지 확인하는 파이프라인
 pipeline {
   agent any
+
+  parameters {
+    string(name : 'repo_name', defaultValue : 'test', description : 'repo_name')
+  }
+
   environment {
     ORG_NAME = "argocd-manifest-test"
-    REPO_NAME = "test"
   }
 
   stages {
     stage('check repo is exist') {
       steps {
         script {
-          def response = sh(returnStdout: true, script: 'curl -w \'%{http_code}\' -o /dev/null https://github.com/${ORG_NAME}/${REPO_NAME}')
-          println "response: ${response}"
+          def url = "https://github.com/${ORG_NAME}/${params.repo_name}"
+          def response = sh(
+            returnStdout: true,
+            script: "curl -w \'%{http_code}\' -o /dev/null " + url
+          )
+
+          // println "response: ${response}"
           if (response == "200"){
             println "Repo is exist"
-          }
-          else if (response == "404"){
+          }else if (response == "404"){
             error("Not found")
           }
         }
