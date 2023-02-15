@@ -40,16 +40,27 @@ pipeline {
                 returnStdout: true,
                 script: "curl -w \'%{http_code}\' -o /dev/null " + argo_manifest_repo
               )
+
               if (chcek_repo_response == "404"){
                 println "argo_manifest_repo(${argo_manifest_repo}) is not exist. create manifest repo."
+
+                // argo manifest repo가 없으면 repo를 생성하고 초기화
                 withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]){
-                  def create_repo_response = sh(returnStdout: true, script: 'curl -w \'%{http_code}\' -o /dev/null -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/${ORG_NAME}/repos -d \'{"name":"' + "${params.application_name}" + '"}\'')
+                  // step1. manifest repo 생성
+                  def github_create_repo_api = "https://api.github.com/orgs/${ORG_NAME}/repos "
+                  def github_auth = "-H \"Authorization: Bearer ${TOKEN}\" "
+                  def github_create_repo_body = "-d '{\"name\": \"${params.application_name}\"}'"
+
+                  def create_repo_response = sh(
+                    returnStdout: true,
+                    script: "curl -w \'%{http_code}\' -o /dev/null "  + github_auth + github_create_repo_api + github_create_repo_body
+                  )
                   if (create_repo_response != "201"){
-                    error("Failed to create repository, response code")
+                    error("Failed to create repository, response code: ${response}")
                   }
 
-                  //todo 템플릿 복사
-                  // sh 'git clone https://github.com/${ORG_NAME}/${REPO_NAME}'
+                  // step2. 초기화
+                  // sh "git clone ${argo_manifest_repo} ./template"
                   // sh 'cd ${REPO_NAME} || wget ${TEMPLATE_URL} || unzip'
                   // sh 'git config'
                   // sh 'git add -A | git commit -m "Bot: Initlaize" | git push'
