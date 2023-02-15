@@ -1,9 +1,13 @@
 // github repo 생성 파이프라인
 pipeline {
   agent any
+
+  parameters {
+    string(name : 'repo_name', defaultValue : 'hello-world', description : 'github repo')
+  }
+
   environment {
     ORG_NAME = "argocd-manifest-test"
-    REPO_NAME = "hello-2223"
   }
 
   stages {
@@ -11,8 +15,14 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) {
           script {
+            def url = "https://api.github.com/orgs/${ORG_NAME}/repos "
+            def auth = "-H \"Authorization: Bearer ${TOKEN}\" "
+            def body = "-d '{\"name\": \"${params.repo_name}\"}'"
 
-            def response = sh(returnStdout: true, script: 'curl -w \'%{http_code}\' -o /dev/null -H "Authorization: Bearer ${TOKEN}" https://api.github.com/orgs/${ORG_NAME}/repos -d \'{"name":"' + "${REPO_NAME}" + '"}\'')
+            def response = sh(
+              returnStdout: true,
+              script: "curl -w \'%{http_code}\' -o /dev/null "  + auth + url + body
+            )
             if (response != "201"){
               error("Failed to create repository, response code: ${response}")
             }
