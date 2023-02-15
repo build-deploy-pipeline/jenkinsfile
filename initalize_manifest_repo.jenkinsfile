@@ -1,0 +1,45 @@
+// argocd manifest repo 생성 후 초기화
+pipeline {
+  agent any
+
+  parameters {
+    string(name : 'repo_name', defaultValue : 'test', description : 'github repo')
+  }
+
+  environment {
+    ORG_NAME = "argocd-manifest-test"
+    TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
+    GITHUB_USERNAME = "choisungwook"
+  }
+
+  stages {
+    stage('initalize repo') {
+      steps {
+        withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]) {
+          // copy template to manifest repo
+          sh """
+            rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+            echo git clone repo && git clone https://${GITHUB_USERNAME}:${TOKEN}@github.com/${ORG_NAME}/${params.repo_name}.git ./manifest_repo
+            echo download template && curl -o template.zip -L  https://github.com/build-deploy-pipeline/argocd-manifest-template/archive/refs/heads/main.zip
+            echo uncompress template &&  unzip -j template.zip -d ./template
+            cp ./template/* ./manifest_repo
+          """
+
+          // git push
+          sh """
+            cd ./manifest_repo
+            git status
+
+            git config --local user.email "jenkins_bot@choilab.com"
+            git config --local user.name "jenkins_bot"
+
+            git add -A
+            git commit --allow-empty -m "copy template"
+
+            git push
+          """
+        }
+      }
+    }
+  }
+}
