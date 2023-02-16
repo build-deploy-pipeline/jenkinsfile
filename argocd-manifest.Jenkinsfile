@@ -10,7 +10,8 @@ pipeline {
     environment {
       // Argo manifest가 있는 github organization
       ORG_NAME = "argocd-manifest-test"
-      TEMPLATE_URL = "TEMPLATE_URL"
+      TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
+      GITHUB_USERNAME = "choisungwook"
     }
     stages {
         stage('checkout') {
@@ -18,23 +19,26 @@ pipeline {
               git branch: "${params.github_branch}", changelog: false, poll: false, url: "${params.github_link}"
             }
         }
+
         stage("Build Docker Image") {
           steps {
-            sh "nerdctl -n k8s.io build -t ${DOCKER_REPOSITORY}/nginx:1.23.3 ."
+            sh "nerdctl -n k8s.io build -t ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} ."
           }
         }
+
         stage("push Docker Image") {
           steps {
             withCredentials([usernamePassword(credentialsId: 'harbor-credentials', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
               sh "nerdctl login harbor.choilab.xyz -u ${HARBOR_USERNAME} -p ${HARBOR_PASSWORD} --insecure-registry"
-              sh "nerdctl -n k8s.io push ${DOCKER_REPOSITORY}/nginx:1.23.3 --insecure-registry"
+              sh "nerdctl -n k8s.io push ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} --insecure-registry"
             }
           }
         }
+
         stage("check exist manifset repo. if not exist, create repo"){
           steps {
             script {
-              // repo가 있는지 확인하고 없으면 repo 생성
+              // step1. repo가 있는지 확인하고 없으면 repo 생성
               def argo_manifest_repo = "https://github.com/${ORG_NAME}/${params.application_name}"
               def chcek_repo_response = sh(
                 returnStdout: true,
@@ -44,9 +48,9 @@ pipeline {
               if (chcek_repo_response == "404"){
                 println "argo_manifest_repo(${argo_manifest_repo}) is not exist. create manifest repo."
 
-                // argo manifest repo가 없으면 repo를 생성하고 초기화
+                // step2. argo manifest repo가 없으면 repo를 생성하고 초기화
                 withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]){
-                  // step1. manifest repo 생성
+                  // manifest repo 생성
                   def github_create_repo_api = "https://api.github.com/orgs/${ORG_NAME}/repos "
                   def github_auth = "-H \"Authorization: Bearer ${TOKEN}\" "
                   def github_create_repo_body = "-d '{\"name\": \"${params.application_name}\"}'"
@@ -59,11 +63,33 @@ pipeline {
                     error("Failed to create repository, response code: ${response}")
                   }
 
-                  // step2. 초기화
-                  // sh "git clone ${argo_manifest_repo} ./template"
-                  // sh 'cd ${REPO_NAME} || wget ${TEMPLATE_URL} || unzip'
-                  // sh 'git config'
-                  // sh 'git add -A | git commit -m "Bot: Initlaize" | git push'
+                  // manifest repo에 template복사
+                  sh """
+                    rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+                    echo git clone repo && git clone https://${GITHUB_USERNAME}:${TOKEN}@github.com/${ORG_NAME}/${params.application_name}.git ./manifest_repo
+                    echo download template && curl -o template.zip -L  https://github.com/build-deploy-pipeline/argocd-manifest-template/archive/refs/heads/main.zip
+                    echo uncompress template &&  unzip -j template.zip -d ./template
+                    cp ./template/* ./manifest_repo
+                  """
+
+                  // git push
+                  sh """
+                    cd ./manifest_repo
+                    git status
+
+                    git config --local user.email "jenkins_bot@choilab.com"
+                    git config --local user.name "jenkins_bot"
+
+                    git add -A
+                    git commit --allow-empty -m "copy template"
+
+                    git push
+                  """
+
+                  // 작업파일 삭제
+                  sh """
+                  rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+                  """
                 }
               }else {
                 println "argo_manifest_repo(${argo_manifest_repo}) alreay exist. skip create manifest repo."
