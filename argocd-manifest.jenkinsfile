@@ -1,0 +1,116 @@
+pipeline {
+    agent any
+
+    parameters {
+      string(name : 'application_name', defaultValue : '', description : 'application_name and used to manifest. this must be unique')
+      string(name : 'github_link', defaultValue : 'https://github.com/build-deploy-pipeline/test-alpine-dockerfile.git', description : 'github link of user')
+      string(name : 'github_branch', defaultValue : 'main', description : 'github branch of user')
+    }
+
+    environment {
+      // Argo manifest가 있는 github organization
+      ORG_NAME = "argocd-manifest-test"
+      TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
+      GITHUB_USERNAME = "choisungwook"
+    }
+    stages {
+        stage('checkout') {
+            steps {
+              git branch: "${params.github_branch}", changelog: false, poll: false, url: "${params.github_link}"
+            }
+        }
+
+        stage("Build Docker Image") {
+          steps {
+            sh "nerdctl -n k8s.io build -t ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} ."
+          }
+        }
+
+        stage("push Docker Image") {
+          steps {
+            withCredentials([usernamePassword(credentialsId: 'harbor-credentials', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+              sh "nerdctl login harbor.choilab.xyz -u ${HARBOR_USERNAME} -p ${HARBOR_PASSWORD} --insecure-registry"
+              sh "nerdctl -n k8s.io push ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} --insecure-registry"
+            }
+          }
+        }
+
+        stage("check exist manifset repo. if not exist, create repo"){
+          steps {
+            script {
+              // step1. repo가 있는지 확인하고 없으면 repo 생성
+              def argo_manifest_repo = "https://github.com/${ORG_NAME}/${params.application_name}"
+              def chcek_repo_response = sh(
+                returnStdout: true,
+                script: "curl -w \'%{http_code}\' -o /dev/null " + argo_manifest_repo
+              )
+
+              if (chcek_repo_response == "404"){
+                println "argo_manifest_repo(${argo_manifest_repo}) is not exist. create manifest repo."
+
+                // step2. argo manifest repo가 없으면 repo를 생성하고 초기화
+                withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]){
+                  // manifest repo 생성
+                  def github_create_repo_api = "https://api.github.com/orgs/${ORG_NAME}/repos "
+                  def github_auth = "-H \"Authorization: Bearer ${TOKEN}\" "
+                  def github_create_repo_body = "-d '{\"name\": \"${params.application_name}\"}'"
+
+                  def create_repo_response = sh(
+                    returnStdout: true,
+                    script: "curl -w \'%{http_code}\' -o /dev/null "  + github_auth + github_create_repo_api + github_create_repo_body
+                  )
+                  if (create_repo_response != "201"){
+                    error("Failed to create repository, response code: ${response}")
+                  }
+
+                  // manifest repo에 template복사
+                  sh """
+                    rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+                    echo git clone repo && git clone https://${GITHUB_USERNAME}:${TOKEN}@github.com/${ORG_NAME}/${params.application_name}.git ./manifest_repo
+                    echo download template && curl -o template.zip -L  https://github.com/build-deploy-pipeline/argocd-manifest-template/archive/refs/heads/main.zip
+                    echo uncompress template &&  unzip -j template.zip -d ./template
+                    cp ./template/* ./manifest_repo
+                  """
+
+                  // git push
+                  sh """
+                    cd ./manifest_repo
+                    git status
+
+                    git config --local user.email "jenkins_bot@choilab.com"
+                    git config --local user.name "jenkins_bot"
+
+                    git add -A
+                    git commit --allow-empty -m "copy template"
+
+                    git push
+                  """
+
+                  // 작업파일 삭제
+                  sh """
+                  rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+                  """
+                }
+              }else {
+                println "argo_manifest_repo(${argo_manifest_repo}) alreay exist. skip create manifest repo."
+              }
+            }
+          }
+        }
+        stage("update manifest"){
+          steps{
+            sh 'echo "update manifest"'
+            // helm values update
+            // sh 'yq ...'
+          }
+        }
+        stage("argocd sync"){
+          steps{
+            sh 'echo "argocd sync"'
+            // sh 'argocd repo add'
+            // sh 'argocd app create'
+            // sh 'argocd app sync'
+          }
+        }
+    }
+}
