@@ -1,3 +1,5 @@
+// 리팩토링을 하지 않은 코드이므로 코드흐름만 파악해주세요!!
+
 pipeline {
     agent any
 
@@ -88,7 +90,7 @@ pipeline {
 
                   // 작업파일 삭제
                   sh """
-                  rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
+                    rm -rf ./manifest_repo && rm -rf ./template && rm -rf ./template.zip
                   """
                 }
               }else {
@@ -99,9 +101,31 @@ pipeline {
         }
         stage("update manifest"){
           steps{
-            sh 'echo "update manifest"'
-            // helm values update
-            // sh 'yq ...'
+            withCredentials([string(credentialsId: 'github_token', variable: 'TOKEN')]){
+              sh "rm -rf ./manifest_repo"
+              sh "echo git clone repo && git clone https://${GITHUB_USERNAME}:${TOKEN}@github.com/${ORG_NAME}/${params.application_name}.git ./manifest_repo"
+
+              // update helm chart values.yaml
+              sh """
+                cd ./manifest_repo
+                image_name="${DOCKER_REPOSITORY}/${params.application_name}" yq -i '.image.repository = strenv(image_name)' values.yaml
+                image_tag="${BUILD_NUMBER}" yq -i '.image.tag = strenv(image_tag)' values.yaml
+              """
+
+              // git push
+              sh """
+                cd ./manifest_repo
+                git status
+
+                git config --local user.email "jenkins_bot@choilab.com"
+                git config --local user.name "jenkins_bot"
+
+                git add -A
+                git commit --allow-empty -m "update manifest"
+
+                git push
+              """
+            }
           }
         }
         stage("argocd sync"){
