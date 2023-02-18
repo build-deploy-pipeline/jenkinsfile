@@ -1,4 +1,4 @@
-// 리팩토링을 하지 않은 코드이므로 코드흐름만 파악해주세요!!
+// manifset repo가 없다면, repo생성 후 template 복사
 
 pipeline {
   agent any
