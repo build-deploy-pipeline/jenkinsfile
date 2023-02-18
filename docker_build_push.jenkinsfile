@@ -1,0 +1,40 @@
+// 리팩토링을 하지 않은 코드이므로 코드흐름만 파악해주세요!!
+
+pipeline {
+  agent any
+
+  parameters {
+    string(name : 'application_name', defaultValue : '', description : 'application_name and used to manifest. this must be unique')
+    string(name : 'github_link', defaultValue : 'https://github.com/build-deploy-pipeline/test-alpine-dockerfile.git', description : 'github link of user')
+    string(name : 'github_branch', defaultValue : 'main', description : 'github branch of user')
+  }
+
+  environment {
+    // Argo manifest가 있는 github organization
+    ORG_NAME = "argocd-manifest-test"
+    TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
+    GITHUB_USERNAME = "choisungwook"
+  }
+  stages {
+    stage('checkout') {
+      steps {
+        git branch: "${params.github_branch}", changelog: false, poll: false, url: "${params.github_link}"
+      }
+    }
+
+    stage("Build Docker Image") {
+      steps {
+        sh "nerdctl -n k8s.io build -t ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} ."
+      }
+    }
+
+    stage("push Docker Image") {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'harbor-credentials', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+          sh "nerdctl login harbor.choilab.xyz -u ${HARBOR_USERNAME} -p ${HARBOR_PASSWORD} --insecure-registry"
+          sh "nerdctl -n k8s.io push ${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER} --insecure-registry"
+        }
+      }
+    }
+  }
+}
