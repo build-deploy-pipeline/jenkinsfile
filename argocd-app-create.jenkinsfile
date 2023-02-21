@@ -1,0 +1,34 @@
+// argocd app create and sync
+pipeline {
+  agent any
+
+  parameters {
+    string(name : 'application_name', defaultValue : 'helloworld-jenkins', description : 'application name')
+  }
+
+  environment {
+    ARGOCD_NAMESPACE = "argo"
+  }
+
+  stages {
+    stage('initalize repo') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'argocd-cred', passwordVariable: 'password', usernameVariable: 'username')]) {
+          sh """
+            echo "y" | argocd login ${argocd_url} --username ${username} --password ${password} --insecure
+
+            if argocd app get ${ARGOCD_NAMESPACE}/${params.application_name} | grep "NotFound":
+            then
+                    echo "hihi"
+            fi
+            argocd app create ${params.application_name} \
+              --repo https://github.com/argocd-manifest-test/demo_application2.git \
+              --path . \
+              --dest-namespace default \
+              --dest-server https://kubernetes.default.svc
+          """
+        }
+      }
+    }
+  }
+}
