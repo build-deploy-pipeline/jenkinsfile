@@ -19,13 +19,16 @@ pipeline {
 
             if argocd app get ${ARGOCD_NAMESPACE}/${params.application_name} | grep "NotFound":
             then
-                    echo "hihi"
+              echo "argocd app ${params.application_name} does not exist. create argocd app ${params.application_name}"
+              argocd app create ${params.application_name} \
+                --repo https://github.com/argocd-manifest-test/demo_application2.git \
+                --path . \
+                --dest-namespace default \
+                --dest-server https://kubernetes.default.svc
             fi
-            argocd app create ${params.application_name} \
-              --repo https://github.com/argocd-manifest-test/demo_application2.git \
-              --path . \
-              --dest-namespace default \
-              --dest-server https://kubernetes.default.svc
+
+            echo "argocd app sync ${params.application_name}"
+            argocd app sync ${params.application_name}
           """
         }
       }
