@@ -109,8 +109,10 @@ pipeline {
           // update helm chart values.yaml
           sh """
             cd ./manifest_repo
-            docker_image="${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER}"
-            image_name=${docker_image} yq -i '.image.repository = strenv(image_name)' values.yaml
+
+            docker_image=${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER}
+
+            docker_image=$docker_image yq -i '.image.repository = strenv(docker_image)' values.yaml
           """
 
           // git push
