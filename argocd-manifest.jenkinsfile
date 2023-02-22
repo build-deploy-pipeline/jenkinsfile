@@ -4,7 +4,7 @@ pipeline {
   agent any
 
   parameters {
-    string(name : 'application_name', defaultValue : '', description : 'application_name and used to manifest. this must be unique')
+    string(name : 'application_name', defaultValue : 'application-name3', description : 'application_name and used to manifest. this must be unique')
     string(name : 'github_link', defaultValue : 'https://github.com/build-deploy-pipeline/test-alpine-dockerfile.git', description : 'github link of user')
     string(name : 'github_branch', defaultValue : 'main', description : 'github branch of user')
   }
@@ -14,6 +14,7 @@ pipeline {
     ORG_NAME = "argocd-manifest-test"
     TEMPLATE_URL = "https://github.com/build-deploy-pipeline/argocd-manifest-template.git"
     GITHUB_USERNAME = "choisungwook"
+    ARGOCD_NAMESPACE = "argo"
   }
   stages {
     stage('checkout') {
@@ -133,10 +134,21 @@ pipeline {
 
     stage("argocd sync"){
       steps{
-        sh 'echo "argocd sync"'
-        // sh 'argocd repo add'
-        // sh 'argocd app create'
-        // sh 'argocd app sync'
+        withCredentials([usernamePassword(credentialsId: 'argocd-cred', passwordVariable: 'password', usernameVariable: 'username')]) {
+          sh """
+            echo "y" | argocd login ${argocd_url} --username ${username} --password ${password} --insecure
+
+            # todo. app create를 계속해도 이상없는지
+            argocd app create ${params.application_name} \
+              --repo https://github.com/${ORG_NAME}/${params.application_name}.git \
+              --path . \
+              --dest-namespace default \
+              --dest-server https://kubernetes.default.svc
+
+            echo "argocd app sync ${params.application_name}"
+            argocd app sync ${params.application_name}
+          """
+        }
       }
     }
   }
