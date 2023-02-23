@@ -112,7 +112,7 @@ pipeline {
             cd ./manifest_repo
 
             export docker_image=${DOCKER_REPOSITORY}/${params.application_name}:${BUILD_NUMBER}
-            yq -i '.image.repository = strenv(docker_image)' values.yaml
+            yq -i '.image = strenv(docker_image)' values.yaml
           """
 
           // git push
